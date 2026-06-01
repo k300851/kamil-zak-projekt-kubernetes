@@ -1,3 +1,134 @@
+## Wymagania
+- Docker
+- Kubernetes
+- kubectl
+- Make
+
+## Uruchomienie
+```bash
+make init
+```
+lub
+```bash
+docker build -t api:1.0 .\app\api
+docker build -t frontend:1.0 .\app\frontend
+docker build -t worker:1.0 .\app\worker
+
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+kubectl apply -k .\k8s\overlays\dev\
+kubectl apply -k .\k8s\overlays\prod\
+```
+
+## Zasoby Kubernetes
+
+
+- Namespace
+- Deployment
+- StatefulSet
+- Service
+- Ingress
+- ConfigMap
+- Secret
+- PersistentVolumeClaim
+- NetworkPolicy
+- PodDisruptionBudget
+- Job
+
+## Udany workflow GitHub Actions
+```
+https://github.com/k300851/kamil-zak-projekt-kubernetes/actions/runs/26777480470
+```
+
+## Komendy kubectl oraz curl
+```bash
+kubectl get namespaces
+kubectl get namespace -n ticket-app-prod
+kubectl get deployments -n ticket-app-prod 
+kubectl get statefulset -n ticket-app-prod
+kubectl get ingress -n ticket-app-prod  
+kubectl get service -n ticket-app-prod
+kubectl get configmap -n ticket-app-prod
+kubectl get secret -n ticket-app-prod   
+kubectl get pvc -n ticket-app-prod
+
+kubectl get deploy -n ticket-app-prod
+kubectl rollout status deployment/api-prod -n ticket-app-prod
+kubectl rollout status deployment/frontend-prod -n ticket-app-prod
+kubectl rollout status deployment/worker-prod -n ticket-app-prod  
+kubectl get pods -n ticket-app-prod  
+
+kubectl describe pod postgres-prod-0 -n ticket-app-prod
+kubectl describe statefulset -n ticket-app-prod  
+kubectl get statefulset -n ticket-app-prod
+kubectl get pvc -n ticket-app-prod
+kubectl describe pvc postgres-data-postgres-prod-0 -n ticket-app-prod
+
+kubectl get svc -n ticket-app-prod  
+kubectl describe ingress -n ticket-app-prod
+
+kubectl get configmap -n ticket-app-prod   
+kubectl describe configmap worker-config-prod -n ticket-app-pro
+kubectl get secret -n ticket-app-prod     
+kubectl describe secret worker-secret-prod -n ticket-app-prod
+kubectl get deployment api-prod -n ticket-app-prod -o yaml
+
+kubectl get deployment api-prod -n ticket-app-prod -o yaml
+kubectl get deployment worker-prod -n ticket-app-prod -o yaml
+kubectl get deployment frontend-prod -n ticket-app-prod -o yaml
+kubectl get pod -n ticket-app-prod
+kubectl describe pod api-prod-5f8fcfd884-nwvwp -n ticket-app-prod
+
+kubectl describe pod db-migration-prod-99qk9  -n ticket-app-prod
+kubectl get job -n ticket-app-prod
+kubectl describe job db-migration-prod -n ticket-app-prod
+kubectl logs jobs/db-migration-prod -n ticket-app-prod 
+
+kubectl delete job db-migration-prod -n ticket-app-prod
+kubectl apply -k .\k8s\overlays\prod\
+
+kubectl get networkpolicy -n ticket-app-prod
+kubectl describe networkpolicy postgres-policy-prod   -n ticket-app-prod
+
+kubectl get pdb -n ticket-app-prod
+kubectl describe pdb api-pdb-prod   -n ticket-app-prod
+
+curl http://localhost/api/metrics
+curl http://localhost/api/health 
+curl http://localhost/api/ready  
+curl http://localhost/api/tickets
+curl -X POST http://localhost/api/tickets -H "Content-Type: application/json" -d "{\"email\": \"test@wp.pl\", \"description\": \"OK\" }"
+```
+
+## Dowód działania workera
+```bash
+> kubectl get pods -n ticket-app-prod
+NAME                            READY   STATUS      RESTARTS   AGE
+api-prod-8688cf597c-4k559       1/1     Running     0          28s
+api-prod-8688cf597c-bq8pq       1/1     Running     0          37s
+db-migration-prod-6nqwl         0/1     Completed   0          10m
+frontend-prod-bdcc7d78b-hp92f   1/1     Running     0          37s
+postgres-prod-0                 1/1     Running     0          10m
+redis-prod-5947f994dc-pttvb     1/1     Running     0          10m
+worker-prod-6489cdb5bc-rdxgt    1/1     Running     0          37s
+worker-prod-6489cdb5bc-stjdd    1/1     Running     0          26s
+> kubectl get svc -n ticket-app-prod
+NAME            TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
+api-prod        ClusterIP   10.106.234.61    <none>        8080/TCP   11m
+frontend-prod   ClusterIP   10.104.227.208   <none>        80/TCP     11m
+postgres-prod   ClusterIP   None             <none>        5432/TCP   11m
+redis-prod      ClusterIP   10.101.238.252   <none>        6379/TCP   11m
+worker-prod     ClusterIP   10.111.50.243    <none>        8081/TCP   11m
+> kubectl logs deployment/worker-prod -n ticket-app-prod
+Found 2 pods, using pod/worker-prod-6489cdb5bc-rdxgt
+> start
+> node src/worker.js
+Redis connected!
+worker works
+Send email to:  { description: 'test', email: 'test@gmail.com' }
+xxxxx@gmail.com
+```
+
+
 # Wymagania wspólne (dla wszystkich projektów)
 ## Wymagania architektoniczne — Kubernetes i CI/CD
 
@@ -49,34 +180,3 @@
 ## Cache, kolejka albo worker
 - [x] Projekt zawiera dodatkowy komponent architektury, np. Redis, RabbitMQ albo worker. Musi być prosty dowód działania w CHECKLIST.md.
 
-    ```bash
-    > kubectl get pods -n ticket-app-prod
-    NAME                            READY   STATUS      RESTARTS   AGE
-    api-prod-8688cf597c-4k559       1/1     Running     0          28s
-    api-prod-8688cf597c-bq8pq       1/1     Running     0          37s
-    db-migration-prod-6nqwl         0/1     Completed   0          10m
-    frontend-prod-bdcc7d78b-hp92f   1/1     Running     0          37s
-    postgres-prod-0                 1/1     Running     0          10m
-    redis-prod-5947f994dc-pttvb     1/1     Running     0          10m
-    worker-prod-6489cdb5bc-rdxgt    1/1     Running     0          37s
-    worker-prod-6489cdb5bc-stjdd    1/1     Running     0          26s
-
-    > kubectl get svc -n ticket-app-prod
-    NAME            TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
-    api-prod        ClusterIP   10.106.234.61    <none>        8080/TCP   11m
-    frontend-prod   ClusterIP   10.104.227.208   <none>        80/TCP     11m
-    postgres-prod   ClusterIP   None             <none>        5432/TCP   11m
-    redis-prod      ClusterIP   10.101.238.252   <none>        6379/TCP   11m
-    worker-prod     ClusterIP   10.111.50.243    <none>        8081/TCP   11m
-
-    > kubectl logs deployment/worker-prod -n ticket-app-prod
-    Found 2 pods, using pod/worker-prod-6489cdb5bc-rdxgt
-
-    > start
-    > node src/worker.js
-
-    Redis connected!
-    worker works
-    Send email to:  { description: 'test', email: 'test@gmail.com' }
-    xxxxx@gmail.com
-    ```
