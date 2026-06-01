@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: worker-config
+  namespace: ticket-app
+data:
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  EMAIL_HOST: smtp.gmail.com
+  EMAIL_PORT: "465"

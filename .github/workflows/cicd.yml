@@ -1,0 +1,77 @@
+name: cicd
+
+on:
+    push:
+        branches:
+            - main
+
+permissions:
+    contents: read
+    packages: write
+
+env:
+    IMAGE_API: ${{ secrets.DOCKERHUB_USERNAME }}/kubernetes-api:${{ github.sha }}
+    IMAGE_API_LATEST: ${{ secrets.DOCKERHUB_USERNAME }}/kubernetes-api:latest
+    IMAGE_FRONTEND: ${{ secrets.DOCKERHUB_USERNAME }}/kubernetes-frontend:${{ github.sha }}
+    IMAGE_WORKER: ${{ secrets.DOCKERHUB_USERNAME }}/kubernetes-worker:${{ github.sha }}
+    NAMESPACE: ticket-app-prod
+
+jobs:
+    build-push-deploy:
+        runs-on: self-hosted
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Login to DockerHub
+              uses: docker/login-action@v3
+              with:
+                  username: ${{ secrets.DOCKERHUB_USERNAME }}
+                  password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+            - name: Build/push API
+              uses: docker/build-push-action@v6
+              with:
+                  context: ./app/api
+                  push: true
+                  tags: |
+                    ${{ env.IMAGE_API }}
+                    ${{ env.IMAGE_API_LATEST }}
+
+            - name: Build/push frontend
+              uses: docker/build-push-action@v6
+              with:
+                  context: ./app/frontend
+                  push: true
+                  tags: ${{ env.IMAGE_FRONTEND }}
+
+            - name: Build/push worker
+              uses: docker/build-push-action@v6
+              with:
+                  context: ./app/worker
+                  push: true
+                  tags: ${{ env.IMAGE_WORKER }}
+
+            - name: Validate kubernetes manufests
+              run: |
+                  kubectl kustomize .\k8s\overlays\prod\
+
+            - name: Apply manifests
+              run: |
+                  kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+                  kubectl apply -k .\k8s\overlays\prod\
+                  kubectl create secret generic worker-secret-prod --from-literal=EMAIL_ADDRESS=${{secrets.EMAIL_ADDRESS}} --from-literal=EMAIL_PASSWORD=${{secrets.EMAIL_PASSWORD}} -n ticket-app-prod --dry-run=client -o yaml | kubectl apply -f -
+                  kubectl rollout restart deployment/worker-prod -n ticket-app-prod
+
+            - name: Update images
+              run: |
+                  kubectl set image deployment/api-prod api=${{env.IMAGE_API}} -n ${{env.NAMESPACE}}
+                  kubectl set image deployment/frontend-prod frontend=${{env.IMAGE_FRONTEND}} -n ${{env.NAMESPACE}}
+                  kubectl set image deployment/worker-prod worker=${{env.IMAGE_WORKER}} -n ${{env.NAMESPACE}}
+
+            - name: Check rollout
+              run: |
+                  kubectl rollout status deployment/api-prod -n ${{env.NAMESPACE}}
+                  kubectl rollout status deployment/frontend-prod -n ${{env.NAMESPACE}}
+                  kubectl rollout status deployment/worker-prod -n ${{env.NAMESPACE}}

@@ -1,0 +1,11 @@
+{
+  "main": "src/worker.js",
+  "scripts": {
+    "start": "node src/worker.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "nodemailer": "^8.0.7",
+    "redis": "^5.12.1"
+  }
+}
